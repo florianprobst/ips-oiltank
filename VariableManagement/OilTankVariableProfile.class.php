@@ -51,6 +51,14 @@ class OilTankVariableProfile{
 	* @access private
 	*/
 	private $suffix;
+	
+	/**
+	* digits behind comma
+	*
+	* @var int
+	* @access private
+	*/
+	private $digits;
 
 	/**
 	* value associations
@@ -107,22 +115,24 @@ class OilTankVariableProfile{
 	* @param int $type IPS datatype
 	* @param string $prefix name prefix
 	* @param string $suffix variable suffix (usually the value unit)
+	* @param int $digits number of digits behind comma
 	* @param array $assoc value to format associations
 	* @param boolean $debug enables / disables debug information
 	* @throws Exception if the parameter \$type is not an IPS datatype
 	* @access public
 	*/
-	public function __construct($name, $type, $prefix = "", $suffix = "", $assoc = NULL, $debug = false){
+	public function __construct($name, $type, $prefix = "", $suffix = "", $digits = 0, $assoc = NULL, $debug = false){
 		$this->name = $name;
 		$this->type = $type;
 		$this->prefix = $prefix;
 		$this->suffix = $suffix;
+		$this->digits = $digits;
 		$this->assoc = $assoc;
 		$this->debug = $debug;
 
 		if($type != self::tBOOL && $type != self::tINT && $type != self::tFLOAT && $type != self::tSTRING)
 		throw new Exception("method __construct does not support profiles of type $type!");
-		$this->create($name, $type, $prefix, $suffix, $assoc);
+		$this->create($name, $type, $prefix, $suffix, $assoc, $digits);
 	}
 
 	/**
@@ -133,9 +143,10 @@ class OilTankVariableProfile{
 	* @param string $prefix name prefix
 	* @param string $suffix variable suffix (usually the value unit)
 	* @param array $assoc value to format associations
+	* @param int $digits number of digits behind comma
 	* @access private
 	*/
-	private function create($name, $type, $prefix = "", $suffix = "", $assoc = NULL){
+	private function create($name, $type, $prefix = "", $suffix = "", $assoc = NULL, $digits){
 		if(!IPS_VariableProfileExists($name)){
 			if($this->debug) echo "INFO - variable profile $name does not exist. It will be created.\n";
 			IPS_CreateVariableProfile($name, $type);
@@ -146,6 +157,7 @@ class OilTankVariableProfile{
 					IPS_SetVariableProfileAssociation($name, $a["val"], $a["name"], $a["icon"], $a["color"]);
 				}
 			}
+			IPS_SetVariableProfileDigits($name, $digits);
 		}
 	}
 

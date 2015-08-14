@@ -101,6 +101,14 @@ class OilTank{
 	private $oil_level_rel;
 	
 	/**
+	* instance id of the oil consumption
+	*
+	* @var OilTankVariable
+	* @access private
+	*/
+	private $oil_consumption;
+	
+	/**
 	* maximum filling height in centimeters
 	*
 	* oil from tank ground to the given height in cm means the tank is at maximum capacity
@@ -132,6 +140,16 @@ class OilTank{
 	* @access private
 	*/
 	private $sensor_gap;
+	
+	/**
+	* update interval
+	*
+	* update interval in seconds
+	*
+	* @var integer
+	* @access private
+	*/
+	private $update_interval;
 	
 	/**
 	* statistics variable: contains html to present the statistics and data of the oil tank
@@ -185,14 +203,16 @@ class OilTank{
 	*
 	* @param integer $parentId set the parent object for all items this script creates
 	* @param integer $archiveId instance id of the archive control (usually located in IPS\core)
+	* @param integer $update_interval interval to update oil tank data (necessary for consumption value)
 	* @param string $prefix the variable name prefix to identify variables and variable profiles created by this script
 	* @param boolean $debug enables / disables debug information
 	* @access public
 	*/
-	public function __construct($parentId, $sensorId, $archiveId, $price_per_liter, $max_filling_height, $capacity, $sensor_gap, $prefix = "OT_", $debug = false){
+	public function __construct($parentId, $sensorId, $archiveId, $update_interval, $price_per_liter, $max_filling_height, $capacity, $sensor_gap, $prefix = "OT_", $debug = false){
 		$this->parentId = $parentId;
 		$this->sensorId = $sensorId;
 		$this->archiveId = $archiveId;
+		$this->update_interval = $update_interval;
 		$this->price_per_liter = $price_per_liter;
 		$this->max_filling_height = $max_filling_height;
 		$this->capacity = $capacity;
@@ -206,14 +226,16 @@ class OilTank{
 		$assoc[2] = ["val"=>40,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor3];
 		$assoc[3] = ["val"=>60,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor2];
 		$assoc[4] = ["val"=>80,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor1];
-		array_push($this->variableProfiles, new OilTankVariableProfile($this->prefix . "oil_level_relative", self::tFLOAT, "", " %", $assoc, $this->debug));
+		array_push($this->variableProfiles, new OilTankVariableProfile($this->prefix . "oil_level_relative", self::tFLOAT, "", " %", 2, $assoc, $this->debug));
 		unset($assoc);
 		
-		array_push($this->variableProfiles, new OilTankVariableProfile($this->prefix . "oil_level_absolute", self::tFLOAT, "", " Liter", NULL, $this->debug));
+		array_push($this->variableProfiles, new OilTankVariableProfile($this->prefix . "oil_level_absolute", self::tFLOAT, "", " Liter", 2, NULL, $this->debug));
+		array_push($this->variableProfiles, new OilTankVariableProfile($this->prefix . "oil_consumption", self::tFLOAT, "", " l/h", 2, NULL, $this->debug));
 		
 		//create variables if they do not exist
 		$this->oil_level_abs = new OilTankVariable($this->prefix . "Oil_Level_Absolute", self::tFLOAT, $this->parentId, $this->variableProfiles[1], true, $this->archiveId, $this->debug);
 		$this->oil_level_rel = new OilTankVariable($this->prefix . "Oil_Level_Relative", self::tFLOAT, $this->parentId, $this->variableProfiles[0], true, $this->archiveId, $this->debug);
+		$this->oil_consumption = new OilTankVariable($this->prefix . "Oil_Consumption", self::tFLOAT, $this->parentId, $this->variableProfiles[2], true, $this->archiveId, $this->debug);
 	}
 	
 	/**
@@ -261,6 +283,29 @@ class OilTank{
 		return round(($this->calculateOilLevelLiters($distance) / $this->capacity) * 100, 2);
 	}
 	
+	
+	/**
+	* calculateConsumptionPerHour
+	*
+	* calculates the oil consumption in liters per hour
+	*
+	* @param float $old_liters
+	* @param float $new_liters
+	* @return float oil consumption per hour
+	* @access private
+	*/
+	private function calculateConsumptionPerHour($old_liters, $new_liters){
+		$consumption = ($old_liters - $new_liters) / $this->update_interval; //per second
+		$consumption = $consumption * 3600; //per hour
+		
+		//if consumption is negative that indicates a refill and can be ignored
+		if($consumption < 0) {
+			return 0.00;
+		}else{
+			return round($consumption, 2);
+		}
+	}
+	
 	/**
 	* update: read new sensor value and update oil levels, statistics, etc.
 	*
@@ -268,7 +313,10 @@ class OilTank{
 	*/
 	public function update(){
 		$distance = GetValue($this->sensorId);
-		$this->oil_level_abs->setValue($this->calculateOilLevelLiters($distance));
+		$old_liters = $this->oil_level_abs->getValue();
+		$new_liters = $this->calculateOilLevelLiters($distance);
+		$this->oil_consumption->setValue($this->calculateConsumptionPerHour($old_liters, $new_liters));
+		$this->oil_level_abs->setValue($new_liters);
 		$this->oil_level_rel->setValue($this->calculateOilLevelInPercent($distance));
 	}
 }

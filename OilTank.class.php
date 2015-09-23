@@ -283,7 +283,6 @@ class OilTank{
 		return round(($this->calculateOilLevelLiters($distance) / $this->capacity) * 100, 2);
 	}
 	
-	
 	/**
 	* calculateConsumptionPerHour
 	*
@@ -306,6 +305,37 @@ class OilTank{
 		}
 	}
 	
+	public function getAverageConsumptionByLastDay(){
+		$startTimestamp = time()-60*60*24;
+		$endTimestamp = time();
+		$limit = 0;
+		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 1, $startTimestamp, $endTimestamp, $limit);
+		$result = round($values[0]["Avg"],2);
+		if($this->debug) echo "getAverageConsumptionByLastDay results in: '$result'\n";
+	//	$res = ($result * 365)
+		return $result;
+	}
+	
+	public function getAverageConsumptionByLastMonth(){
+		$startTimestamp = time()-60*60*24*30;
+		$endTimestamp = time();
+		$limit = 0;
+		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 1, $startTimestamp, $endTimestamp, $limit);
+		$result = round($values[0]["Avg"],2);
+		if($this->debug) echo "getAverageConsumptionByLastMonth results in: '$result'\n";
+		return $result;
+	}
+	
+	public function getAverageConsumptionByLastYear(){
+		$startTimestamp = time()-60*60*24*30*365;
+		$endTimestamp = time();
+		$limit = 0;
+		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 1, $startTimestamp, $endTimestamp, $limit);
+		$result = round($values[0]["Avg"],2);
+		if($this->debug) echo "getAverageConsumptionByLastYear results in: '$result'\n";
+		return $result;
+	}
+			
 	/**
 	* update: read new sensor value and update oil levels, statistics, etc.
 	*
@@ -318,6 +348,9 @@ class OilTank{
 		$this->oil_consumption->setValue($this->calculateConsumptionPerHour($old_liters, $new_liters));
 		$this->oil_level_abs->setValue($new_liters);
 		$this->oil_level_rel->setValue($this->calculateOilLevelInPercent($distance));
+		$this->getAverageConsumptionByLastDay();
+		$this->getAverageConsumptionByLastMonth();
+		$this->getAverageConsumptionByLastYear();
 	}
 }
 ?>

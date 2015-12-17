@@ -44,6 +44,7 @@ require_once("../webfront/user/ips-oiltank/OilTank.class.php");
 $parentId = 24854 /*[System\Skripte\OilTank\Variables]*/; //Ablageort für erstellte Variablen
 $sensorId = 17807 /*[Hardware\Keller\Heizölkeller\JKM-868 (LevelJET)\Distance]*/;   //sensordaten welche den gemessenen Ölpegel in cm angeben
 $archiveId= 18531 /*[Archiv]*/; //Instanz ID des IPS-Archivs in welchem die Werte des Öltanks geloggt werden sollen.
+$update_interval = 1200; //update interval in sekunden (wie oft werden die sensordaten ausgelesen und wie werden die daten aggregiert) Dieser Wert sollte dem Wert der Sensoraktualisierung entsprechen.
 $preis_pro_liter = 0.6027; // Preis pro Liter Heizöl deines Anbieters
 $max_fuellhohe = 120; //maximale füllhöhe des behälters in cm
 $sensor_abstand = 16; //Abstand des Sensors zum öl-pegel eines maximal befüllten behälters
@@ -52,7 +53,7 @@ $debug = true;
 $prefix = "OT_";
 
 //ab hier nichts ändern
-$oiltank = new OilTank($parentId, $sensorId, $archiveId, $preis_pro_liter, $max_fuellhohe, $max_tank_inhalt, $sensor_abstand, $prefix, $debug);
+$oiltank = new OilTank($parentId, $sensorId, $archiveId, $update_interval, $preis_pro_liter, $max_fuellhohe, $max_tank_inhalt, $sensor_abstand, $prefix, $debug);
 ?>
 ```
 

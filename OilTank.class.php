@@ -38,7 +38,7 @@ class OilTank{
 	/**
 	* variable name prefix to identify variables and variable profiles created by this script
 	*
-	* @var string
+	* @var integer
 	* @access private
 	*/
 	private $prefix;
@@ -208,7 +208,7 @@ class OilTank{
 	* @param boolean $debug enables / disables debug information
 	* @access public
 	*/
-	public function __construct($parentId, $sensorId, $archiveId, $update_interval, $price_per_liter, $max_filling_height, $capacity, $sensor_gap, $prefix = "OT_", $debug = false){
+	public function __construct($parentId, $sensorId, $archiveId, $update_interval, $price_per_liter, $max_filling_height, $capacity, $sensor_gap, $prefix, $debug){
 		$this->parentId = $parentId;
 		$this->sensorId = $sensorId;
 		$this->archiveId = $archiveId;
@@ -310,6 +310,7 @@ class OilTank{
 		$endTimestamp = time();
 		$limit = 0;
 		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 1, $startTimestamp, $endTimestamp, $limit);
+
 		$result = round($values[0]["Avg"],2);
 		if($this->debug) echo "getAverageConsumptionByLastDay results in: '$result'\n";
 	//	$res = ($result * 365)
@@ -320,7 +321,8 @@ class OilTank{
 		$startTimestamp = time()-60*60*24*30;
 		$endTimestamp = time();
 		$limit = 0;
-		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 1, $startTimestamp, $endTimestamp, $limit);
+		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 3, $startTimestamp, $endTimestamp, $limit);
+
 		$result = round($values[0]["Avg"],2);
 		if($this->debug) echo "getAverageConsumptionByLastMonth results in: '$result'\n";
 		return $result;
@@ -330,7 +332,8 @@ class OilTank{
 		$startTimestamp = time()-60*60*24*30*365;
 		$endTimestamp = time();
 		$limit = 0;
-		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 1, $startTimestamp, $endTimestamp, $limit);
+		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 4, $startTimestamp, $endTimestamp, $limit);
+
 		$result = round($values[0]["Avg"],2);
 		if($this->debug) echo "getAverageConsumptionByLastYear results in: '$result'\n";
 		return $result;

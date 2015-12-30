@@ -410,6 +410,7 @@ class OilTank{
 		$this->getAverageConsumptionByLastDay();
 		$this->getAverageConsumptionByLastMonth();
 		$this->getAverageConsumptionByLastYear();
+		
 		IPS_LogMessage("IPS-Oiltank [#" . $_IPS['SELF'] . "]", "Oil-Level = " . $this->oil_level_abs->getValue() . " liters (" . $this->oil_level_rel->getValue() . " %) - fill height = " . $this->calculateOilLevelCm($distance) . " cm");
 	}
 }

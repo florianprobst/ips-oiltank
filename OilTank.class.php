@@ -152,6 +152,18 @@ class OilTank{
 	private $update_interval;
 	
 	/**
+	* oil level table
+	*
+	* free form oil tanks do not have a linear oil level
+	* so we do need this table with some defined oil level heights
+	* the level between those points will be assumed as linear
+	*
+	* @var array
+	* @access private
+	*/
+	private $level_table;
+	
+	/**
 	* statistics variable: contains html to present the statistics and data of the oil tank
 	* maybe deprecated...
 	*
@@ -202,13 +214,19 @@ class OilTank{
 	* Constructor
 	*
 	* @param integer $parentId set the parent object for all items this script creates
+	* @param integer $sensorId instance id where we get the distance from the sensor to the oil level
 	* @param integer $archiveId instance id of the archive control (usually located in IPS\core)
 	* @param integer $update_interval interval to update oil tank data (necessary for consumption value)
+	* @param float $price_per_liter pricing for 1 liter oil
+	* @param integer $max_filling_height oil from tank ground to the given height in cm means the tank is at maximum capacity
+	* @param integer $capacity the tanks capacity in liters
+	* @param integer $sensor_gap distance of the sensor to the oil level at a 100% capacity in centimeters
+	* @param integer $level_table free from tanks need defined distance-to-oil-level pairs since we cannot assume a linear oil level (optional, only if tank oil level is not linear)
 	* @param string $prefix the variable name prefix to identify variables and variable profiles created by this script
 	* @param boolean $debug enables / disables debug information
 	* @access public
 	*/
-	public function __construct($parentId, $sensorId, $archiveId, $update_interval, $price_per_liter, $max_filling_height, $capacity, $sensor_gap, $prefix, $debug){
+	public function __construct($parentId, $sensorId, $archiveId, $update_interval, $price_per_liter, $max_filling_height, $capacity, $sensor_gap, $level_table = NULL, $prefix = "OT_", $debug = false){
 		$this->parentId = $parentId;
 		$this->sensorId = $sensorId;
 		$this->archiveId = $archiveId;
@@ -217,15 +235,16 @@ class OilTank{
 		$this->max_filling_height = $max_filling_height;
 		$this->capacity = $capacity;
 		$this->sensor_gap = $sensor_gap;
+		$this->level_table = $level_table;
 		$this->debug = $debug;
 		$this->prefix = $prefix;
 		
 		//create variable profiles if they do not exist
-		$assoc[0] = ["val"=>0,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor5];
-		$assoc[1] = ["val"=>20,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor4];
+		$assoc[0] = ["val"=>0,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor1];
+		$assoc[1] = ["val"=>20,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor2];
 		$assoc[2] = ["val"=>40,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor3];
-		$assoc[3] = ["val"=>60,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor2];
-		$assoc[4] = ["val"=>80,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor1];
+		$assoc[3] = ["val"=>60,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor4];
+		$assoc[4] = ["val"=>80,	"name"=>"%.1f",	"icon" => "", "color" => self::hColor5];
 		array_push($this->variableProfiles, new OilTankVariableProfile($this->prefix . "oil_level_relative", self::tFLOAT, "", " %", 2, $assoc, $this->debug));
 		unset($assoc);
 		
@@ -257,13 +276,50 @@ class OilTank{
 	* @access private
 	*/
 	private function calculateOilLevelLiters($distance){
-		return round($this->calculateLitersPerCm() * $this->calculateOilLevelCm($distance), 2);
+		if($this->level_table == NULL){ //linear oil level
+			return round($this->calculateLitersPerCm() * $this->calculateOilLevelCm($distance), 2);
+		}else{ //free form tank, we need the level table
+			$level = $this->calculateOilLevelCm($distance); //get current filling level in cm
+			$counter = 0;
+			foreach ($this->level_table as &$p) {
+				//print_r("compare $level cm >= " . $p["level_in_cm"]);
+				if($level >= $p["level_in_cm"]){
+			 		//we exceeded the measure point given in the table, the valid level is the previous one
+			 		//since we didnt increment our counter yet, the counter tells the truth :-)
+			 		break;
+			 	}
+			 	$counter++;
+			}
+			
+			//print_r(count($this->level_table));
+			if($counter >= count($this->level_table)){
+				IPS_LogMessage("IPS-Oiltank [#" . $_IPS['SELF'] . "]", "Laufzeit beträgt ". "Der gemessene Ölstand von '$level' cm ist in der Füllstandstabelle nicht definiert. Bitte Sensor und Füllstandstabelle prüfen!");
+				throw new Exception("The measured oil level of '$level' cm is not defined in the level table! Please check your sensor data!");
+			}
+			
+			//get the high and low level point from our table where our current oil level is between
+			if ($counter == 0) {
+			 	//maybe in our level table is no point defined which explicitely tells us that a level of 0 means 0 liters of oil. so we fix that here
+			 	$lower_level = [ "level_in_cm" => 0, "liters" => 0 ];
+			}else{
+				$lower_level = $this->level_table[$counter-1];
+			}
+			$higher_level = $this->level_table[$counter];
+			
+			//now we assume that our oil level will be linear between both level points from the table
+			$oil_delta = $higher_level["liters"] - $lower_level["liters"];
+			$level_delta = $higher_level["level_in_cm"] - $lower_level["level_in_cm"];
+			$liters_per_cm = round($oil_delta / $level_delta, 2); //linear between both table points
+			$level = $level - $lower_level["level_in_cm"];
+			return $lower_level["liters"] + round($level * $liters_per_cm, 2); //its the liters of the lower table point plus the linear level between lower and higher point
+		}
 	}
 	
 	/**
 	* calculateLitersPerCm
 	*
 	* based on the tank data, each oil level cm means a specific amout of oil in liters
+	* if tank allows linear calculation.
 	*
 	* @return float oil liters per cm
 	* @access private
@@ -354,6 +410,7 @@ class OilTank{
 		$this->getAverageConsumptionByLastDay();
 		$this->getAverageConsumptionByLastMonth();
 		$this->getAverageConsumptionByLastYear();
+		IPS_LogMessage("IPS-Oiltank [#" . $_IPS['SELF'] . "]", "Oil-Level = " . $this->oil_level_abs->getValue() . " liters (" . $this->oil_level_rel->getValue() . " %) - fill height = " . $this->calculateOilLevelCm($distance) . " cm");
 	}
 }
 ?>

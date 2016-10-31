@@ -282,16 +282,15 @@ class OilTank{
 			$level = $this->calculateOilLevelCm($distance); //get current filling level in cm
 			$counter = 0;
 			foreach ($this->level_table as &$p) {
-				//print_r("compare $level cm >= " . $p["level_in_cm"]);
-				if($level >= $p["level_in_cm"]){
+				//print_r("compare $level cm >= " . $p["level_in_cm"] . "<p>");
+				if($level < $p["level_in_cm"]){
 			 		//we exceeded the measure point given in the table, the valid level is the previous one
-			 		//since we didnt increment our counter yet, the counter tells the truth :-)
+			 		$counter--;
 			 		break;
 			 	}
 			 	$counter++;
 			}
 			
-			//print_r(count($this->level_table));
 			if($counter >= count($this->level_table)){
 				IPS_LogMessage("IPS-Oiltank [#" . $_IPS['SELF'] . "]", "Laufzeit beträgt ". "Der gemessene Ölstand von '$level' cm ist in der Füllstandstabelle nicht definiert. Bitte Sensor und Füllstandstabelle prüfen!");
 				throw new Exception("The measured oil level of '$level' cm is not defined in the level table! Please check your sensor data!");
@@ -305,6 +304,8 @@ class OilTank{
 				$lower_level = $this->level_table[$counter-1];
 			}
 			$higher_level = $this->level_table[$counter];
+			
+			//print("Leveltable contains " . count($this->level_table) . " entries. Measured distance is " . $distance . " cm wich hits entry: " . $counter . " from " . $lower_level["level_in_cm"] ."-". $higher_level["level_in_cm"] ." cm<p>");
 			
 			//now we assume that our oil level will be linear between both level points from the table
 			$oil_delta = $higher_level["liters"] - $lower_level["liters"];
@@ -378,7 +379,7 @@ class OilTank{
 		$endTimestamp = time();
 		$limit = 0;
 		$values = AC_GetAggregatedValues($this->oil_consumption->getArchiveId(), $this->oil_consumption->getId(), 3, $startTimestamp, $endTimestamp, $limit);
-
+		
 		$result = round($values[0]["Avg"],2);
 		if($this->debug) echo "getAverageConsumptionByLastMonth results in: '$result'\n";
 		return $result;
@@ -407,9 +408,11 @@ class OilTank{
 		$this->oil_consumption->setValue($this->calculateConsumptionPerHour($old_liters, $new_liters));
 		$this->oil_level_abs->setValue($new_liters);
 		$this->oil_level_rel->setValue($this->calculateOilLevelInPercent($distance));
-		$this->getAverageConsumptionByLastDay();
+		
+		//disable methods since they are buggy atm :-)
+		/*$this->getAverageConsumptionByLastDay();
 		$this->getAverageConsumptionByLastMonth();
-		$this->getAverageConsumptionByLastYear();
+		$this->getAverageConsumptionByLastYear();*/
 		
 		IPS_LogMessage("IPS-Oiltank [#" . $_IPS['SELF'] . "]", "Oil-Level = " . $this->oil_level_abs->getValue() . " liters (" . $this->oil_level_rel->getValue() . " %) - fill height = " . $this->calculateOilLevelCm($distance) . " cm");
 	}
